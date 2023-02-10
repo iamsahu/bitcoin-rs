@@ -18,11 +18,10 @@ impl FieldElement {
     }
 
     pub fn pow(&self, exponent: BigInt) -> Self {
-        let mut exp = exponent;
-        if exp < 0_i32.to_bigint().unwrap() {
-            exp = exp + (self.prime.clone() - 1_i32.to_bigint().unwrap());
-        }
-        let num = self.num.modpow(&exp, &self.prime);
+        let num = self.num.modpow(
+            &exponent.modpow(&1_i32.to_bigint().unwrap(), &(self.prime.clone() - 1)), // Forcing out of being negative
+            &self.prime,
+        );
         Self {
             prime: self.prime.clone(),
             num,
@@ -95,6 +94,7 @@ impl ops::Div for FieldElement {
         if self.prime != other.prime {
             panic!("Cannot add elements of different primes");
         }
+        // Fermat's little theorem
         let num = (self.num
             * other.num.modpow(
                 &(self.prime.clone() - 2_i32.to_bigint().unwrap()),
