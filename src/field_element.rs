@@ -2,11 +2,12 @@ use num_bigint::BigInt;
 use num_bigint::ToBigInt;
 use std::fmt;
 use std::ops;
+use std::ops::Mul;
 
-#[derive(Debug, Eq)]
+#[derive(Debug, Clone, Eq)]
 pub struct FieldElement {
-    prime: BigInt,
-    num: BigInt,
+    pub prime: BigInt,
+    pub num: BigInt,
 }
 
 impl FieldElement {
@@ -50,6 +51,18 @@ impl ops::Add for FieldElement {
     }
 }
 
+impl ops::Add<i64> for FieldElement {
+    type Output = FieldElement;
+
+    fn add(self, other: i64) -> FieldElement {
+        let num = (other.to_bigint().unwrap() + self.num) % self.prime.clone();
+        FieldElement {
+            prime: self.prime,
+            num,
+        }
+    }
+}
+
 impl ops::Sub for FieldElement {
     type Output = Self;
 
@@ -72,7 +85,7 @@ impl ops::Sub for FieldElement {
     }
 }
 
-impl ops::Mul for FieldElement {
+impl Mul for FieldElement {
     type Output = Self;
 
     fn mul(self, other: Self) -> Self {
@@ -81,6 +94,30 @@ impl ops::Mul for FieldElement {
         }
         let num = (self.num * other.num) % self.prime.clone();
         Self {
+            prime: self.prime,
+            num,
+        }
+    }
+}
+
+impl Mul<FieldElement> for i64 {
+    type Output = FieldElement;
+
+    fn mul(self, other: FieldElement) -> FieldElement {
+        let num = (self.to_bigint().unwrap() * other.num) % other.prime.clone();
+        FieldElement {
+            prime: other.prime,
+            num,
+        }
+    }
+}
+
+impl Mul<i64> for FieldElement {
+    type Output = FieldElement;
+
+    fn mul(self, other: i64) -> FieldElement {
+        let num = (other.to_bigint().unwrap() * self.num) % self.prime.clone();
+        FieldElement {
             prime: self.prime,
             num,
         }
@@ -104,6 +141,19 @@ impl ops::Div for FieldElement {
         Self {
             prime: self.prime,
             num,
+        }
+    }
+}
+
+impl fmt::Display for FieldElement {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match (self.num.clone(), self.prime.clone()) {
+            (num, prime) => {
+                write!(f, "FieldElement({},{})", num, prime)
+            }
+            _ => {
+                panic!("This shouldn't happen");
+            }
         }
     }
 }

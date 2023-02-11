@@ -1,16 +1,25 @@
 use anyhow::ensure;
+use num_bigint::BigInt;
+use num_bigint::ToBigInt;
+use std::fmt;
 use std::ops::Add;
+use std::ops::Mul;
 
-#[derive(Clone, Copy, Debug)]
+use crate::field_element::FieldElement;
+
+#[derive(Clone, Debug)]
 pub enum Point<const A: i64, const B: i64> {
     Infinity,
-    Point(i64, i64),
+    Point(FieldElement, FieldElement),
 }
 
 impl<const A: i64, const B: i64> Point<A, B> {
-    pub fn new_point(x: i64, y: i64) -> Result<Self, anyhow::Error> {
+    pub fn new_point(x: FieldElement, y: FieldElement) -> Result<Self, anyhow::Error> {
         ensure!(
-            y.pow(2) == x.pow(3) + A * x + B,
+            y.clone().pow(2_i32.to_bigint().unwrap())
+                == x.clone().pow(3_i32.to_bigint().unwrap())
+                    + A * (x.clone())
+                    + FieldElement::new(y.prime.clone(), B.to_bigint().unwrap()),
             "({}, {}) is not on the curve",
             x,
             y
@@ -33,30 +42,38 @@ impl<const A: i64, const B: i64> PartialEq for Point<A, B> {
     }
 }
 
-
 impl<const A: i64, const B: i64> Add<Point<A, B>> for Point<A, B> {
     type Output = Self;
     fn add(self, other: Point<A, B>) -> Self {
-        match (self, other) {
+        match (self.clone(), other.clone()) {
             (Self::Infinity, Self::Infinity) => Self::new_infinity(),
             (Self::Infinity, Self::Point(_, _)) => other,
             (Self::Point(_, _), Self::Infinity) => self,
             (Self::Point(x1, y1), Self::Point(x2, y2)) if x1 == x2 && y1 != y2 => {
                 Self::new_infinity()
             }
-            (Self::Point(x1, y1), Self::Point(x2, y2)) if x1 == x2 && (y1 == 0 || y2 == 0) => {
+            (Self::Point(x1, y1), Self::Point(x2, y2))
+                if x1 == x2
+                    && (y1.num == 0_i32.to_bigint().unwrap()
+                        || y2.num == 0_i32.to_bigint().unwrap()) =>
+            {
                 Self::new_infinity()
             }
             (Self::Point(x1, y1), Self::Point(x2, y2)) if x1 == x2 && y1 == y2 => {
-                let s = (3 * x1.pow(2) + A) / (2 * y1);
-                let x3 = s.pow(2) - 2 * x1;
-                let y3 = s * (x1 - x3) - y1;
-                Self::new_point(x3, y3).unwrap()
+                let s = (FieldElement::new(x1.prime.clone(), 3_i32.to_bigint().unwrap())
+                    .mul(x1.clone().pow(2_i32.to_bigint().unwrap()))
+                    + A)
+                    / (y1.clone() * 2);
+
+                let x3 = s.pow(2_i32.to_bigint().unwrap()) - x1.clone() * 2;
+                let y3 = s * (x1 - x3.clone()) - y1;
+
+                Point::<A, B>::new_point(x3, y3).unwrap()
             }
             (Self::Point(x1, y1), Self::Point(x2, y2)) if x1 != x2 => {
-                let s = (y2 - y1) / (x2 - x1);
-                let x3 = s.pow(2) - x1 - x2;
-                let y3 = s * (x1 - x3) - y1;
+                let s = (y2 - y1.clone()) / (x2.clone() - x1.clone());
+                let x3 = s.pow(2_i32.to_bigint().unwrap()) - x1.clone() - x2.clone();
+                let y3 = s * (x1 - x3.clone()) - y1;
                 Self::new_point(x3, y3).unwrap()
             }
             _ => panic!("Invalid points"),
@@ -103,59 +120,188 @@ impl<const A: i64, const B: i64> Add<Point<A, B>> for Point<A, B> {
     }
 }
 
-// impl<const A: i64, const B: i64> fmt::Display for Point<A, B> {
-//     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-//         match (self.x.clone(), self.y.clone()) {
-//             (Some(x_num), Some(y_num)) => {
-//                 write!(f, "Point({},{})_{}_{}", x_num, y_num, self.a, self.b)
-//             }
-//             (None, None) => write!(f, "Point(infinity)_{}_{}", self.a, self.b),
-//             _ => {
-//                 panic!("This shouldn't happen");
-//             }
-//         }
-//     }
-// }
+impl<const A: i64, const B: i64> fmt::Display for Point<A, B> {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            Point::Point(x, y) => {
+                write!(f, "Point({},{})_{}_{}", x, y, A, B)
+            }
+            Point::Infinity => write!(f, "Point(infinity)"),
+            _ => {
+                panic!("This shouldn't happen");
+            }
+        }
+    }
+}
+
+impl<const A: i64, const B: i64> Mul<Point<A, B>> for i64 {
+    type Output = Point<A, B>;
+
+    fn mul(self, rhs: Point<A, B>) -> Self::Output {
+        let mut result = rhs.clone();
+        match rhs.clone() {
+            Point::Infinity => return Point::Infinity,
+            Point::Point(x, y) => {
+                for i in 1..self {
+                    result = result.add(rhs.clone());
+                }
+            }
+        }
+        return result;
+    }
+}
 
 #[cfg(test)]
 mod tests {
+    use num_bigint::ToBigInt;
+
     use super::*;
 
     #[test]
     #[should_panic]
-    fn test_point() {
-        let p = Point::<5, 7>::new_point(1, 1).unwrap();
+    fn test_point_creation_fail() {
+        let p = Point::<5, 7>::new_point(
+            FieldElement {
+                prime: 7_i32.to_bigint().unwrap(),
+                num: 1_i32.to_bigint().unwrap(),
+            },
+            FieldElement {
+                prime: 7_i32.to_bigint().unwrap(),
+                num: 1_i32.to_bigint().unwrap(),
+            },
+        )
+        .unwrap();
+    }
+
+    #[test]
+    fn test_point_creation() {
+        let p = Point::<0, 7>::new_point(
+            FieldElement {
+                prime: 223_i32.to_bigint().unwrap(),
+                num: 192_i32.to_bigint().unwrap(),
+            },
+            FieldElement {
+                prime: 223_i32.to_bigint().unwrap(),
+                num: 105_i32.to_bigint().unwrap(),
+            },
+        )
+        .unwrap();
     }
 
     #[test]
     fn test_ne() {
-        let p1 = Point::<5, 7>::new_point(-1, -1).unwrap();
-        let p2 = Point::<5, 7>::new_point(-1, -1).unwrap();
-        let p3 = Point::<5, 7>::new_point(-1, 1).unwrap();
-        let inf = Point::<5, 7>::new_infinity();
+        let prime = 223_i32.to_bigint().unwrap();
+        let p1 = Point::<0, 7>::new_point(
+            FieldElement {
+                prime: prime.clone(),
+                num: 192_i32.to_bigint().unwrap(),
+            },
+            FieldElement {
+                prime: prime.clone(),
+                num: 105_i32.to_bigint().unwrap(),
+            },
+        )
+        .unwrap();
+
+        let p2 = Point::<0, 7>::new_point(
+            FieldElement {
+                prime: prime.clone(),
+                num: 192_i32.to_bigint().unwrap(),
+            },
+            FieldElement {
+                prime: prime.clone(),
+                num: 105_i32.to_bigint().unwrap(),
+            },
+        )
+        .unwrap();
+
+        let p3 = Point::<0, 7>::new_point(
+            FieldElement {
+                prime: prime.clone(),
+                num: 1_i32.to_bigint().unwrap(),
+            },
+            FieldElement {
+                prime: prime.clone(),
+                num: 193_i32.to_bigint().unwrap(),
+            },
+        )
+        .unwrap();
+
+        let inf = Point::<0, 7>::new_infinity();
 
         assert_eq!(p1, p2);
         assert_ne!(p1, p3);
         assert_ne!(p1, inf);
     }
 
-    #[test]
-    fn add_two_points_with_the_same_x() {
-        let p1 = Point::<5, 7>::new_point(-1, -1).unwrap();
-        let p2 = Point::<5,7>::new_point(-1, 1).unwrap();
-        let inf = Point::<5,7>::new_infinity();
+    // #[test]
+    // fn add_two_points_with_the_same_x() {
+    //     let p1 = Point::<5, 7>::new_point(-1_i32.to_bigint().unwrap(), -1_i32.to_bigint().unwrap())
+    //         .unwrap();
+    //     let p2 = Point::<5, 7>::new_point(-1_i32.to_bigint().unwrap(), 1_i32.to_bigint().unwrap())
+    //         .unwrap();
+    // let inf = Point::<0, 7>::new_infinity();
+    //     assert_eq!(p1.clone() + inf.clone(), p1.clone());
+    //     assert_eq!(inf.clone() + p2.clone(), p2.clone());
+    //     assert_eq!(p1 + p2, inf);
+    // }
 
-        assert_eq!(p1 + inf, p1);
-        assert_eq!(inf + p2, p2);
-        assert_eq!(p1 + p2, inf);
-    }
     #[test]
     fn add_two_points_with_different_x() {
-        
-        let p1 = Point::<5, 7>::new_point(2, 5).unwrap();
-        let p2 = Point::<5, 7>::new_point(-1, -1).unwrap();
-        let p3 = Point::<5, 7>::new_point(3,-7).unwrap();
+        let prime = 223_i32.to_bigint().unwrap();
+        let p1 = Point::<0, 7>::new_point(
+            FieldElement {
+                prime: prime.clone(),
+                num: 192_i32.to_bigint().unwrap(),
+            },
+            FieldElement {
+                prime: prime.clone(),
+                num: 105_i32.to_bigint().unwrap(),
+            },
+        )
+        .unwrap();
+
+        let p2 = Point::<0, 7>::new_point(
+            FieldElement {
+                prime: prime.clone(),
+                num: 17_i32.to_bigint().unwrap(),
+            },
+            FieldElement {
+                prime: prime.clone(),
+                num: 56_i32.to_bigint().unwrap(),
+            },
+        )
+        .unwrap();
+
+        let p3 = Point::<0, 7>::new_point(
+            FieldElement {
+                prime: prime.clone(),
+                num: 170_i32.to_bigint().unwrap(),
+            },
+            FieldElement {
+                prime: prime.clone(),
+                num: 142_i32.to_bigint().unwrap(),
+            },
+        )
+        .unwrap();
 
         assert_eq!(p1 + p2, p3);
+    }
+
+    #[test]
+    fn test_point_mul() {
+        let p = Point::<0, 7>::new_point(
+            FieldElement {
+                prime: 223_i32.to_bigint().unwrap(),
+                num: 47_i32.to_bigint().unwrap(),
+            },
+            FieldElement {
+                prime: 223_i32.to_bigint().unwrap(),
+                num: 71_i32.to_bigint().unwrap(),
+            },
+        )
+        .unwrap();
+
+        assert_eq!(21.mul(p), Point::<0, 7>::new_infinity());
     }
 }

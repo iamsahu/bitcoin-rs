@@ -15,16 +15,16 @@ mod tests {
 
     #[test]
     fn test_on_curve() {
-        let prime: BigInt = 223_i32.to_bigint().unwrap();
-        let a: field_element::FieldElement =
-            field_element::FieldElement::new(prime.clone(), 0_i32.to_bigint().unwrap());
-        let b: field_element::FieldElement =
-            field_element::FieldElement::new(prime.clone(), 7_i32.to_bigint().unwrap());
-        let valid_points = [
-            point::Point::<0, 7>::new_point(
-                Some(field_element::FieldElement::new(prime.clone(), 192_i32.to_bigint().unwrap())),
-                Some(field_element::FieldElement::new(prime.clone(), 105_i32.to_bigint().unwrap())),
-            ),
-        ] 
+        // let prime: BigInt = 223_i32.to_bigint().unwrap();
+        // let a: field_element::FieldElement =
+        //     field_element::FieldElement::new(prime.clone(), 0_i32.to_bigint().unwrap());
+        // let b: field_element::FieldElement =
+        //     field_element::FieldElement::new(prime.clone(), 7_i32.to_bigint().unwrap());
+        // let valid_points = [
+        //     point::Point::<0, 7>::new_point(
+        //         (field_element::FieldElement::new(prime.clone(), 192_i32.to_bigint().unwrap())),
+        //         (field_element::FieldElement::new(prime.clone(), 105_i32.to_bigint().unwrap())),
+        //     ),
+        // ] ;
     }
 }
