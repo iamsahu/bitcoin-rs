@@ -78,45 +78,6 @@ impl<const A: i64, const B: i64> Add<Point<A, B>> for Point<A, B> {
             }
             _ => panic!("Invalid points"),
         }
-        // if A != rhs.A || self.b != rhs.b {
-        //     panic!(
-        //         "Points {}, {} are not on the same curve",
-        //         self.clone(),
-        //         rhs.clone()
-        //     );
-        // }
-        // if self.x == None {
-        //     return rhs;
-        // }
-        // if rhs.x == None {
-        //     return self;
-        // }
-        // if self.x == rhs.x && self.y != rhs.y {
-        //     return Self::new(None, None, self.a, self.b);
-        // }
-        // if self.x != rhs.x {
-        //     let s = (rhs.y.clone().unwrap() - self.y.clone().unwrap())
-        //         / (rhs.x.clone().unwrap() - self.x.clone().unwrap());
-        //     let x = s.clone().pow(2) - self.x.clone().unwrap() - rhs.x.clone().unwrap();
-        //     let y = s * (self.x.clone().unwrap() - x.clone()) - self.y.clone().unwrap();
-        //     return Self::new(Some(x), Some(y), self.a, self.b);
-        // }
-        // if self == rhs {
-        //     let s = (3_i32.to_bigint().unwrap() * self.x.clone().unwrap().pow(2) + self.a.clone())
-        //         / (2_i32.to_bigint().unwrap() * self.y.clone().unwrap());
-        //     let x = s.clone().pow(2) - 2_i32.to_bigint().unwrap() * self.x.clone().unwrap();
-        //     let y = s * (self.x.clone().unwrap() - x.clone()) - self.y.clone().unwrap();
-        //     return Self::new(Some(x), Some(y), self.a.clone(), self.b);
-        // }
-        // if self == rhs && self.y == Some(0_i32.to_bigint().unwrap() * self.x.clone().unwrap()) {
-        //     return Self::new(None, None, self.a, self.b);
-        // }
-        // Self {
-        //     x: self.x,
-        //     y: self.y,
-        //     a: self.a,
-        //     b: self.b,
-        // }
     }
 }
 
@@ -138,16 +99,26 @@ impl<const A: i64, const B: i64> Mul<Point<A, B>> for i64 {
     type Output = Point<A, B>;
 
     fn mul(self, rhs: Point<A, B>) -> Self::Output {
-        let mut result = rhs.clone();
+        let mut result = Point::Infinity;
         match rhs.clone() {
             Point::Infinity => return Point::Infinity,
             Point::Point(x, y) => {
-                for i in 1..self {
-                    result = result.add(rhs.clone());
+                for i in 1..(self + 1) {
+                    result = result + rhs.clone();
                 }
             }
         }
         return result;
+    }
+}
+
+pub trait PointOps {
+    fn rmul(&self, n: i64) -> Self;
+}
+
+impl<const A: i64, const B: i64> PointOps for Point<A, B> {
+    fn rmul(&self, n: i64) -> Self {
+        n * self.clone()
     }
 }
 
@@ -301,7 +272,35 @@ mod tests {
             },
         )
         .unwrap();
+        assert_eq!(
+            20.mul(p),
+            Point::<0, 7>::new_point(
+                FieldElement {
+                    prime: 223_i32.to_bigint().unwrap(),
+                    num: 47_i32.to_bigint().unwrap(),
+                },
+                FieldElement {
+                    prime: 223_i32.to_bigint().unwrap(),
+                    num: 152_i32.to_bigint().unwrap(),
+                },
+            )
+            .unwrap()
+        );
+    }
 
-        assert_eq!(21.mul(p), Point::<0, 7>::new_infinity());
+    #[test]
+    fn test_point_mul2() {
+        let p = Point::<0, 7>::new_point(
+            FieldElement {
+                prime: 223_i32.to_bigint().unwrap(),
+                num: 15_i32.to_bigint().unwrap(),
+            },
+            FieldElement {
+                prime: 223_i32.to_bigint().unwrap(),
+                num: 86_i32.to_bigint().unwrap(),
+            },
+        )
+        .unwrap();
+        assert_eq!(7.mul(p), Point::Infinity);
     }
 }

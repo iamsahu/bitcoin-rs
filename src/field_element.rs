@@ -18,6 +18,16 @@ impl FieldElement {
         Self { prime, num }
     }
 
+    pub fn new_secp256k1(num: BigInt) -> Self {
+        let prime: BigInt = 2_i32.to_bigint().unwrap().pow(256)
+            - 2_i32.to_bigint().unwrap().pow(32)
+            - 977_i32.to_bigint().unwrap();
+        Self {
+            prime: prime,
+            num: num,
+        }
+    }
+
     pub fn pow(&self, exponent: BigInt) -> Self {
         let num = self.num.modpow(
             &exponent.modpow(&1_i32.to_bigint().unwrap(), &(self.prime.clone() - 1)), // Forcing out of being negative
